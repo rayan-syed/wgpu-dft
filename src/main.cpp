@@ -13,10 +13,18 @@ int main() {
     initWebGPU(context);
 
     // input matrix
-    vector<vector<complex<float>>> input = {
-        { {1.0f, 1.0f}, {2.0f, 2.0f} },
-        { {3.0f, 3.0f}, {4.0f, 4.0f} }
+    std::vector<std::vector<std::complex<float>>> input = {
+        { {1.0f, 1.0f},  {2.0f, 2.0f},  {3.0f, 3.0f},  {4.0f, 4.0f} },
+        { {5.0f, 5.0f},  {6.0f, 6.0f},  {7.0f, 7.0f},  {8.0f, 8.0f} },
+        { {9.0f, 9.0f},  {10.0f, 10.0f}, {11.0f, 11.0f}, {12.0f, 12.0f} },
+        { {13.0f, 13.0f},{14.0f, 14.0f},{15.0f, 15.0f},{16.0f, 16.0f} }
     };
+    
+    //expected
+    // Row 0: (136,136)   (-16,0)    (-8,-8)    (0,-16)
+    // Row 1: (-64,0)     (0,0)      (0,0)      (0,0)
+    // Row 2: (-32,-32)   (0,0)      (0,0)      (0,0)
+    // Row 3: (0,-64)     (0,0)      (0,0)      (0,0)
 
     // compute 2D dft
     int rows = input.size();
