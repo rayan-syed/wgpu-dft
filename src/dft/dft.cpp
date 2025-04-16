@@ -1,10 +1,6 @@
 #include "dft.h"
-#include <cmath>
-#include <vector>
-#include <complex>
-#include <cstdint>
 
-static size_t totalElements;
+static size_t buffer_size;
 
 struct Params {
     int rows;
@@ -43,13 +39,13 @@ static wgpu::BindGroup createBindGroup(wgpu::Device& device, wgpu::BindGroupLayo
     inputEntry.binding = 0;
     inputEntry.buffer = inputBuffer;
     inputEntry.offset = 0;
-    inputEntry.size = sizeof(float) * 2 * totalElements;
+    inputEntry.size = sizeof(float) * 2 * buffer_size;
 
     wgpu::BindGroupEntry outputEntry = {};
     outputEntry.binding = 1;
     outputEntry.buffer = outputBuffer;
     outputEntry.offset = 0;
-    outputEntry.size = sizeof(float) * 2 * totalElements;
+    outputEntry.size = sizeof(float) * 2 * buffer_size;
 
     wgpu::BindGroupEntry uniformEntry = {};
     uniformEntry.binding = 2;
@@ -67,59 +63,71 @@ static wgpu::BindGroup createBindGroup(wgpu::Device& device, wgpu::BindGroupLayo
     return device.createBindGroup(bindGroupDesc);
 }
 
-void dft(WebGPUContext& context, wgpu::Buffer& outputBuffer, std::vector<std::vector<std::complex<float>>>& input) {
-    // save matrix dimensions
+void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<std::vector<std::complex<float>>>& input) {
+    // Get matrix dims
     int rows = input.size();
-    int cols = rows > 0 ? input[0].size() : 0;
+    int cols = (rows > 0) ? input[0].size() : 0;
 
-    // flatten dft row-major order
-    std::vector<std::complex<float>> dft_input;
-    dft_input.reserve(rows * cols);
+    // Flatten matrix row-major order - prep for row dft pass
+    std::vector<std::complex<float>> flatInput;
+    flatInput.reserve(rows * cols);
     for (const auto &row : input) {
-        dft_input.insert(dft_input.end(), row.begin(), row.end());
+        flatInput.insert(flatInput.end(), row.begin(), row.end());
     }
-    
-    totalElements = dft_input.size();
-    Params params = {rows,cols};
 
-    // INITIALIZING WEBGPU
+    buffer_size = flatInput.size();
+    Params params = {rows, cols};
+
+    // Retrieve device and queue.
     wgpu::Device device = context.device;
     wgpu::Queue queue = context.queue;
 
-    // LOADING AND COMPILING THE SHADER CODE
-    std::string shaderCode = readShaderFile("src/dft/dft.wgsl");
-    wgpu::ShaderModule shaderModule = createShaderModule(device, shaderCode);
-
-    // CREATE BUFFERS
-    
-    wgpu::Buffer inputBuffer = createBuffer(device, dft_input.data(), sizeof(float) * 2 * totalElements, wgpu::BufferUsage::Storage);
+    // Create the uniform buffer for dimensions.
     wgpu::Buffer uniformBuffer = createBuffer(device, &params, sizeof(Params), wgpu::BufferUsage::Uniform);
 
-    // CREATING BIND GROUP AND LAYOUT
-    wgpu::BindGroupLayout bindGroupLayout = createBindGroupLayout(device);
-    wgpu::BindGroup bindGroup = createBindGroup(
-        device, 
-        bindGroupLayout, 
-        inputBuffer, 
-        outputBuffer, 
-        uniformBuffer
-    );
+    // ROW DFT PASS -> save output in intermediate buffer before column pass
+    wgpu::Buffer inputBuffer = createBuffer(device, flatInput.data(), sizeof(float) * 2 * buffer_size, wgpu::BufferUsage::Storage);
+    wgpu::Buffer intermediateBuffer = createBuffer(device, nullptr, sizeof(float) * 2 * buffer_size, WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc));
 
-    // CREATING COMPUTE PIPELINE
-    wgpu::ComputePipeline computePipeline = createComputePipeline(device, shaderModule, bindGroupLayout);
+    std::string shaderCodeRow = readShaderFile("src/dft/dft_row.wgsl");
+    wgpu::ShaderModule shaderModuleRow = createShaderModule(device, shaderCodeRow);
 
-    // ENCODING AND DISPATCHING COMPUTE COMMANDS
-    uint32_t workgroupsX = (cols + 15) / 16;
-    uint32_t workgroupsY = (rows + 15) / 16;
-    wgpu::CommandBuffer commandBuffer = createComputeCommandBuffer(device, computePipeline, bindGroup, workgroupsX, workgroupsY);
-    queue.submit(1, &commandBuffer);
+    wgpu::BindGroupLayout bindGroupLayoutRow = createBindGroupLayout(device);
+    wgpu::BindGroup bindGroupRow = createBindGroup(device, bindGroupLayoutRow, inputBuffer, intermediateBuffer, uniformBuffer);
+    wgpu::ComputePipeline computePipelineRow = createComputePipeline(device, shaderModuleRow, bindGroupLayoutRow);
 
-    // RELEASE RESOURCES
-    commandBuffer.release();
-    computePipeline.release();
-    bindGroup.release();
-    bindGroupLayout.release();
-    shaderModule.release();
+    // Note: same workgroups for row pass & col pass
+    int workgroupsX = (cols + 15) / 16;
+    int workgroupsY = (rows + 15) / 16;
+
+    wgpu::CommandBuffer commandBufferRow = createComputeCommandBuffer(device, computePipelineRow, bindGroupRow, workgroupsX, workgroupsY);
+    queue.submit(1, &commandBufferRow);
+
+    // Clean row pass resources before doing column pass
+    commandBufferRow.release();
+    computePipelineRow.release();
+    bindGroupRow.release();
+    bindGroupLayoutRow.release();
+    shaderModuleRow.release();
     inputBuffer.release();
+
+    // COLUMN DFT PASS
+    std::string shaderCodeCol = readShaderFile("src/dft/dft_col.wgsl");
+    wgpu::ShaderModule shaderModuleCol = createShaderModule(device, shaderCodeCol);
+
+    wgpu::BindGroupLayout bindGroupLayoutCol = createBindGroupLayout(device);
+    wgpu::BindGroup bindGroupCol = createBindGroup(device, bindGroupLayoutCol, intermediateBuffer, finalOutputBuffer, uniformBuffer);
+    wgpu::ComputePipeline computePipelineCol = createComputePipeline(device, shaderModuleCol, bindGroupLayoutCol);
+
+    wgpu::CommandBuffer commandBufferCol = createComputeCommandBuffer(device, computePipelineCol, bindGroupCol, workgroupsX, workgroupsY);
+    queue.submit(1, &commandBufferCol);
+
+    // Clean all resources
+    commandBufferCol.release();
+    computePipelineCol.release();
+    bindGroupCol.release();
+    bindGroupLayoutCol.release();
+    shaderModuleCol.release();
     uniformBuffer.release();
+    intermediateBuffer.release();
 }
