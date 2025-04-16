@@ -60,9 +60,8 @@ def main():
     # Print top 5 offenders if necessary
     if mismatches > 0:
         print("Top 5 biggest mismatches:")
-        # look at the largest errors
         diff = np.abs(wgpu_dft - np_dft)
-        # find indices of the 10 largest errors
+        # find indices of the 5 largest errors
         flat_idx = np.argsort(diff.ravel())[::-1][:5]
         for idx in flat_idx:
             i, j = divmod(idx, is_close.shape[1])
