@@ -35,7 +35,7 @@ int main() {
     }
 
     // print matrix
-    cout << "Complex Matrix:" << endl;
+    cout << "DFT Output (real,imag):" << endl;
     for (const auto& row : result) {
         for (const auto& val : row) {
             cout << "(" << val.real() << ", " << val.imag() << ") ";
