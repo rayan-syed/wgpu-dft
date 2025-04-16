@@ -3,55 +3,66 @@
 #include "webgpu_utils.h"
 #include <vector>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <complex>
+#include <string>
 
 using namespace std;
 
 int main() {
-    // Initialize WebGPU
+    // read input matrix
+    ifstream infile("input.txt");
+    if (!infile) {
+        cerr << "Failed to open input.txt" << endl;
+        return -1;
+    }
+
+    int rows, cols;
+    infile >> rows >> cols;
+    vector<vector<complex<float>>> input(rows, vector<complex<float>>(cols));
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            float re, im;
+            infile >> re >> im;
+            input[i][j] = {re,im};
+        }
+    }
+    infile.close();
+
+    // init wgpu
     WebGPUContext context;
     initWebGPU(context);
 
-    // input matrix
-    std::vector<std::vector<std::complex<float>>> input = {
-        { {1.0f, 1.0f},  {2.0f, 2.0f},  {3.0f, 3.0f},  {4.0f, 4.0f} },
-        { {5.0f, 5.0f},  {6.0f, 6.0f},  {7.0f, 7.0f},  {8.0f, 8.0f} },
-        { {9.0f, 9.0f},  {10.0f, 10.0f}, {11.0f, 11.0f}, {12.0f, 12.0f} },
-        { {13.0f, 13.0f},{14.0f, 14.0f},{15.0f, 15.0f},{16.0f, 16.0f} }
-    };
+    // init output buffer
+    int total = rows * cols;
+    wgpu::Buffer dftBuffer = createBuffer(context.device, nullptr, sizeof(float) * 2 * total,
+        WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc));
     
-    //expected
-    // Row 0: (136,136)   (-16,0)    (-8,-8)    (0,-16)
-    // Row 1: (-64,0)     (0,0)      (0,0)      (0,0)
-    // Row 2: (-32,-32)   (0,0)      (0,0)      (0,0)
-    // Row 3: (0,-64)     (0,0)      (0,0)      (0,0)
-
-    // compute 2D dft
-    int rows = input.size();
-    int cols = rows > 0 ? input[0].size() : 0;
-    wgpu::Buffer dftBuffer = createBuffer(context.device, nullptr, sizeof(float) * 2 * rows * cols, WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc));
+    // compute 2D DFT
     dft(context, dftBuffer, input);
-    vector<float> dft_out = readBack(context.device, context.queue, 2 * rows * cols, dftBuffer);
+    vector<float> dft_out = readBack(context.device, context.queue, 2 * total, dftBuffer);
 
-    // reform matrix
-    vector<vector<complex<float>>> result(rows, vector<complex<float>>(cols));
+    // reform output into a 2D matrix
+    vector<vector<std::complex<float>>> result(rows, vector<std::complex<float>>(cols));
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
-            int index = (i * cols + j) * 2; // Real and imaginary parts
-            result[i][j] = {dft_out[index], dft_out[index + 1]};
+            int index = (i * cols + j) * 2;
+            result[i][j] = { dft_out[index], dft_out[index + 1] };
         }
     }
 
-    // print matrix
-    cout << "DFT Output (real,imag):" << endl;
-    for (const auto& row : result) {
-        for (const auto& val : row) {
-            cout << "(" << val.real() << ", " << val.imag() << ") ";
+    // print output for test script to read in
+    cout << rows << " " << cols << "\n";
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            cout << result[i][j].real() << " " << result[i][j].imag();
+            if (j < cols - 1) cout << " ";
         }
-        cout << endl;
+        cout << "\n";
     }
 
-    // Release WebGPU resources
+    // clear wgpu resources
     wgpuQueueRelease(context.queue);
     wgpuDeviceRelease(context.device);
     wgpuAdapterRelease(context.adapter);
