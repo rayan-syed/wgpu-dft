@@ -15,7 +15,8 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     // Compute DFT
     for (var row = 0; row < dims.x; row = row + 1) {
-        let angle = -2.0 * pi * f32(l * row) / f32(dims.x);
+        let phase = fract(f32(row * l) / f32(dims.x)); // shrink phase to preserve precision
+        let angle = -2.0 * pi * phase;
         let euler = vec2<f32>(cos(angle), sin(angle));
         let idx = row * dims.y + col;
         let val = input[idx];

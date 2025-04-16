@@ -92,13 +92,13 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     std::string shaderCodeRow = readShaderFile("src/dft/dft_row.wgsl");
     wgpu::ShaderModule shaderModuleRow = createShaderModule(device, shaderCodeRow);
 
-    wgpu::BindGroupLayout bindGroupLayoutRow = createBindGroupLayout(device);
-    wgpu::BindGroup bindGroupRow = createBindGroup(device, bindGroupLayoutRow, inputBuffer, intermediateBuffer, uniformBuffer);
-    wgpu::ComputePipeline computePipelineRow = createComputePipeline(device, shaderModuleRow, bindGroupLayoutRow);
+    wgpu::BindGroupLayout bindGroupLayout = createBindGroupLayout(device);
+    wgpu::BindGroup bindGroupRow = createBindGroup(device, bindGroupLayout, inputBuffer, intermediateBuffer, uniformBuffer);
+    wgpu::ComputePipeline computePipelineRow = createComputePipeline(device, shaderModuleRow, bindGroupLayout);
 
     // Note: same workgroups for row pass & col pass
-    int workgroupsX = (cols + 15) / 16;
-    int workgroupsY = (rows + 15) / 16;
+    uint32_t workgroupsX = std::ceil(double(cols)/16.0);
+    uint32_t workgroupsY = std::ceil(double(rows)/16.0);
 
     wgpu::CommandBuffer commandBufferRow = createComputeCommandBuffer(device, computePipelineRow, bindGroupRow, workgroupsX, workgroupsY);
     queue.submit(1, &commandBufferRow);
@@ -107,7 +107,6 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     commandBufferRow.release();
     computePipelineRow.release();
     bindGroupRow.release();
-    bindGroupLayoutRow.release();
     shaderModuleRow.release();
     inputBuffer.release();
 
@@ -115,9 +114,8 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     std::string shaderCodeCol = readShaderFile("src/dft/dft_col.wgsl");
     wgpu::ShaderModule shaderModuleCol = createShaderModule(device, shaderCodeCol);
 
-    wgpu::BindGroupLayout bindGroupLayoutCol = createBindGroupLayout(device);
-    wgpu::BindGroup bindGroupCol = createBindGroup(device, bindGroupLayoutCol, intermediateBuffer, finalOutputBuffer, uniformBuffer);
-    wgpu::ComputePipeline computePipelineCol = createComputePipeline(device, shaderModuleCol, bindGroupLayoutCol);
+    wgpu::BindGroup bindGroupCol = createBindGroup(device, bindGroupLayout, intermediateBuffer, finalOutputBuffer, uniformBuffer);
+    wgpu::ComputePipeline computePipelineCol = createComputePipeline(device, shaderModuleCol, bindGroupLayout);
 
     wgpu::CommandBuffer commandBufferCol = createComputeCommandBuffer(device, computePipelineCol, bindGroupCol, workgroupsX, workgroupsY);
     queue.submit(1, &commandBufferCol);
@@ -126,7 +124,7 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     commandBufferCol.release();
     computePipelineCol.release();
     bindGroupCol.release();
-    bindGroupLayoutCol.release();
+    bindGroupLayout.release();
     shaderModuleCol.release();
     uniformBuffer.release();
     intermediateBuffer.release();

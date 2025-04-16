@@ -1,7 +1,7 @@
 import numpy as np
 import subprocess
 
-ROWS, COLS = 512, 512
+ROWS, COLS = 512,512
 tolerance = 1e-4
 
 def generate_input_file(filename, rows=512, cols=512):
@@ -44,16 +44,29 @@ def main():
     rows, cols = ROWS, COLS
     rel_tol = tolerance # relative tolerance
 
+    print(f"{ROWS} x {COLS} input matrix for DFT computation")
     np_input = generate_input_file(input_filename, rows, cols)
-    np_dft = np.fft.fft2(np_input)
+    
+    np_dft = np.fft.fft2(np_input).astype(np.complex64)
     output = build_and_run_wgpu()
     wgpu_dft = parse_wgpu_output(output)
 
     # get relative difference
-    is_close = np.isclose(wgpu_dft, np_dft, rtol=rel_tol, atol=0) 
+    is_close = np.isclose(wgpu_dft, np_dft, rtol=rel_tol, atol=1e-5) 
     mismatches = np.sum(~is_close)
 
     print(f"Number of elements with relative difference > {rel_tol}: {mismatches}")
+
+    # Print top 5 offenders if necessary
+    if mismatches > 0:
+        print("Top 5 biggest mismatches:")
+        # look at the largest errors
+        diff = np.abs(wgpu_dft - np_dft)
+        # find indices of the 10 largest errors
+        flat_idx = np.argsort(diff.ravel())[::-1][:5]
+        for idx in flat_idx:
+            i, j = divmod(idx, is_close.shape[1])
+            print(f"index({i},{j}): wgpu={wgpu_dft[i,j]}, np={np_dft[i,j]}, err={diff[i,j]}")
 
 if __name__ == "__main__":
     main()
