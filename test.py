@@ -1,7 +1,7 @@
 import numpy as np
 import subprocess
 
-ROWS, COLS = 512,512
+ROWS, COLS = 2048,2048
 tolerance = 1e-4
 
 def generate_input_file(filename, rows=512, cols=512):
@@ -20,8 +20,8 @@ def generate_input_file(filename, rows=512, cols=512):
     return input_complex
 
 def build_and_run_wgpu():
-    subprocess.run(["cmake", "-B", "build", "-S", "."], check=True)
-    subprocess.run(["cmake", "--build", "build"], check=True)
+    subprocess.run(["cmake", "-B", "build", "-S", "."], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["cmake", "--build", "build"], check=True, stdout = subprocess.DEVNULL)
     # capture stdout of wgpu for comparison
     result = subprocess.run(["./build/wgpu_dft"], check=True, stdout=subprocess.PIPE, universal_newlines=True)
     return result.stdout
@@ -57,15 +57,35 @@ def main():
 
     print(f"Number of elements with relative difference > {rel_tol}: {mismatches}")
 
-    # Print top 5 offenders if necessary
-    if mismatches > 0:
-        print("Top 5 biggest mismatches:")
-        diff = np.abs(wgpu_dft - np_dft)
-        # find indices of the 5 largest errors
-        flat_idx = np.argsort(diff.ravel())[::-1][:5]
-        for idx in flat_idx:
-            i, j = divmod(idx, is_close.shape[1])
-            print(f"index({i},{j}): wgpu={wgpu_dft[i,j]}, np={np_dft[i,j]}, err={diff[i,j]}")
+    # Print top 5 offenders as necessary
+    import heapq
+    inds = np.argwhere(~is_close)
+    biggest_rel_err = []
+    biggest_err = (0,[])
+    for (i,j) in inds:  
+        w = wgpu_dft[i,j]
+        e = np_dft[i,j]
+        err = abs(w-e)
+        rel = err / abs(e) if abs(e)>0 else err
+        if rel > biggest_err[0]:
+            biggest_err = (rel, [w,e,err])
+
+        # keep 5 biggest errors
+        if len(biggest_rel_err) < 5 and err > 1e-5:
+            heapq.heappush(biggest_rel_err, rel) 
+        elif rel > min(biggest_rel_err) and err > 1e-5: 
+            heapq.heappop(biggest_rel_err)
+            heapq.heappush(biggest_rel_err, rel)
+
+    print("Top 5 biggest relative errors (largest->smallest) with absolute error > 1e-5:")
+    biggest_rel_err.sort(reverse=True)
+    for err in biggest_rel_err:
+        print(err)
+
+    print("\nBiggest relative difference details:")
+    items = biggest_err[1]
+    print(f"wgpu: {items[0]}, np: {items[1]}, abs_err: {items[2]}")
+
 
 if __name__ == "__main__":
     main()
