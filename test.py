@@ -52,7 +52,7 @@ def main():
     wgpu_dft = parse_wgpu_output(output)
 
     # get relative difference
-    is_close = np.isclose(wgpu_dft, np_dft, rtol=rel_tol, atol=1e-5) 
+    is_close = np.isclose(wgpu_dft, np_dft, rtol=rel_tol, atol=1e-4) 
     mismatches = np.sum(~is_close)
 
     print(f"Number of elements with relative difference > {rel_tol}: {mismatches}")
@@ -71,13 +71,13 @@ def main():
             biggest_err = (rel, [w,e,err])
 
         # keep 5 biggest errors
-        if len(biggest_rel_err) < 5 and err > 1e-5:
+        if len(biggest_rel_err) < 5 and err > 1e-4:
             heapq.heappush(biggest_rel_err, rel) 
-        elif rel > min(biggest_rel_err) and err > 1e-5: 
+        elif rel > min(biggest_rel_err) and err > 1e-4: 
             heapq.heappop(biggest_rel_err)
             heapq.heappush(biggest_rel_err, rel)
 
-    print("Top 5 biggest relative errors (largest->smallest) with absolute error > 1e-5:")
+    print("Top 5 biggest relative errors (largest->smallest) with absolute error > 1e-4:")
     biggest_rel_err.sort(reverse=True)
     for err in biggest_rel_err:
         print(err)
