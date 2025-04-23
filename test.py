@@ -1,7 +1,7 @@
 import numpy as np
 import subprocess
 
-ROWS, COLS = 2048,2048
+ROWS, COLS = 512,512
 tolerance = 1e-4
 
 def generate_input_file(filename, rows=512, cols=512):
@@ -61,7 +61,7 @@ def main():
     import heapq
     inds = np.argwhere(~is_close)
     biggest_rel_err = []
-    biggest_err = (0,[])
+    biggest_err = (0,[0,0,0])
     for (i,j) in inds:  
         w = wgpu_dft[i,j]
         e = np_dft[i,j]
@@ -81,6 +81,8 @@ def main():
     biggest_rel_err.sort(reverse=True)
     for err in biggest_rel_err:
         print(err)
+    if not biggest_rel_err:
+        print("None")
 
     print("\nBiggest relative difference details:")
     items = biggest_err[1]

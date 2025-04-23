@@ -81,6 +81,9 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     // Retrieve device and queue.
     wgpu::Device device = context.device;
     wgpu::Queue queue = context.queue;
+    WorkgroupLimits limits = getWorkgroupLimits(device);
+    limits.maxWorkgroupSizeX = std::min(limits.maxWorkgroupSizeX, sqrt(limits.maxInvocationsPerWorkgroup));
+    limits.maxWorkgroupSizeY = std::min(limits.maxWorkgroupSizeY, sqrt(limits.maxInvocationsPerWorkgroup));
 
     // Create the uniform buffer for dimensions.
     wgpu::Buffer uniformBuffer = createBuffer(device, &params, sizeof(Params), wgpu::BufferUsage::Uniform);
@@ -89,7 +92,7 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     wgpu::Buffer inputBuffer = createBuffer(device, flatInput.data(), sizeof(float) * 2 * buffer_size, wgpu::BufferUsage::Storage);
     wgpu::Buffer intermediateBuffer = createBuffer(device, nullptr, sizeof(float) * 2 * buffer_size, WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc));
 
-    std::string shaderCodeRow = readShaderFile("src/dft/dft_row.wgsl");
+    std::string shaderCodeRow = readShaderFile("src/dft/dft_row.wgsl", limits.maxWorkgroupSizeX, limits.maxWorkgroupSizeY);
     wgpu::ShaderModule shaderModuleRow = createShaderModule(device, shaderCodeRow);
 
     wgpu::BindGroupLayout bindGroupLayout = createBindGroupLayout(device);
@@ -111,7 +114,7 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     inputBuffer.release();
 
     // COLUMN DFT PASS
-    std::string shaderCodeCol = readShaderFile("src/dft/dft_col.wgsl");
+    std::string shaderCodeCol = readShaderFile("src/dft/dft_col.wgsl", limits.maxWorkgroupSizeX, limits.maxWorkgroupSizeY);
     wgpu::ShaderModule shaderModuleCol = createShaderModule(device, shaderCodeCol);
 
     wgpu::BindGroup bindGroupCol = createBindGroup(device, bindGroupLayout, intermediateBuffer, finalOutputBuffer, uniformBuffer);

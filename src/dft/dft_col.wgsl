@@ -2,7 +2,7 @@
 @group(0) @binding(1) var<storage, read_write> output: array<vec2<f32>>;
 @group(0) @binding(2) var<uniform> dims: vec2<i32>; // rows, cols
 
-@compute @workgroup_size(16, 16)
+@compute @workgroup_size({{WORKGROUP_SIZE}})
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let col = i32(global_id.x); 
     let l = i32(global_id.y);   // freq index
