@@ -8,6 +8,6 @@
 #include <webgpu/webgpu.hpp>
 #include "../webgpu_utils.h"
 
-void dft(WebGPUContext& context, wgpu::Buffer& outputBuffer, std::vector<std::vector<std::complex<float>>>& input);
+void dft(WebGPUContext& context, wgpu::Buffer& outputBuffer, std::vector<std::complex<float>>& input, int rows, int cols);
 
 #endif 

@@ -63,19 +63,9 @@ static wgpu::BindGroup createBindGroup(wgpu::Device& device, wgpu::BindGroupLayo
     return device.createBindGroup(bindGroupDesc);
 }
 
-void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<std::vector<std::complex<float>>>& input) {
-    // Get matrix dims
-    int rows = input.size();
-    int cols = (rows > 0) ? input[0].size() : 0;
+void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<std::complex<float>>& input, int rows, int cols) {
 
-    // Flatten matrix row-major order - prep for row dft pass
-    std::vector<std::complex<float>> flatInput;
-    flatInput.reserve(rows * cols);
-    for (const auto &row : input) {
-        flatInput.insert(flatInput.end(), row.begin(), row.end());
-    }
-
-    buffer_size = flatInput.size();
+    buffer_size = input.size();
     Params params = {rows, cols};
 
     // Retrieve device and queue.
@@ -89,7 +79,7 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     wgpu::Buffer uniformBuffer = createBuffer(device, &params, sizeof(Params), wgpu::BufferUsage::Uniform);
 
     // ROW DFT PASS -> save output in intermediate buffer before column pass
-    wgpu::Buffer inputBuffer = createBuffer(device, flatInput.data(), sizeof(float) * 2 * buffer_size, wgpu::BufferUsage::Storage);
+    wgpu::Buffer inputBuffer = createBuffer(device, input.data(), sizeof(float) * 2 * buffer_size, wgpu::BufferUsage::Storage);
     wgpu::Buffer intermediateBuffer = createBuffer(device, nullptr, sizeof(float) * 2 * buffer_size, WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc));
 
     std::string shaderCodeRow = readShaderFile("src/dft/dft_row.wgsl", limits.maxWorkgroupSizeX, limits.maxWorkgroupSizeY);

@@ -30,6 +30,13 @@ int main() {
     }
     infile.close();
 
+    // Flatten matrix row-major order for dft input
+    vector<complex<float>> flatInput;
+    flatInput.reserve(rows * cols);
+    for (const auto &row : input) {
+        flatInput.insert(flatInput.end(), row.begin(), row.end());
+    }
+
     // init wgpu
     WebGPUContext context;
     initWebGPU(context);
@@ -40,7 +47,7 @@ int main() {
         WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc));
     
     // compute 2D DFT
-    dft(context, dftBuffer, input);
+    dft(context, dftBuffer, flatInput, rows, cols);
     vector<float> dft_out = readBack(context.device, context.queue, 2 * total, dftBuffer);
 
     // reform output into a 2D matrix
