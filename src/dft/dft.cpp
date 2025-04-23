@@ -100,8 +100,8 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     wgpu::ComputePipeline computePipelineRow = createComputePipeline(device, shaderModuleRow, bindGroupLayout);
 
     // Note: same workgroups for row pass & col pass
-    uint32_t workgroupsX = std::ceil(double(cols)/16.0);
-    uint32_t workgroupsY = std::ceil(double(rows)/16.0);
+    uint32_t workgroupsX = std::ceil(double(cols)/limits.maxWorkgroupSizeX);
+    uint32_t workgroupsY = std::ceil(double(rows)/limits.maxWorkgroupSizeY);
 
     wgpu::CommandBuffer commandBufferRow = createComputeCommandBuffer(device, computePipelineRow, bindGroupRow, workgroupsX, workgroupsY);
     queue.submit(1, &commandBufferRow);
