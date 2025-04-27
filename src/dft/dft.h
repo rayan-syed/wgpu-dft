@@ -8,6 +8,13 @@
 #include <webgpu/webgpu.hpp>
 #include "../webgpu_utils.h"
 
-void dft(WebGPUContext& context, wgpu::Buffer& outputBuffer, std::vector<std::complex<float>>& input, int rows, int cols);
+void dft(
+    WebGPUContext& context,
+    wgpu::Buffer& outputBuffer,
+    std::vector<std::complex<float>>& input, 
+    int rows,
+    int cols,
+    uint32_t doInverse
+);
 
 #endif 

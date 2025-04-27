@@ -62,7 +62,7 @@ static wgpu::BindGroup createBindGroup(wgpu::Device& device, wgpu::BindGroupLayo
     inverseFlagEntry.binding = 3;
     inverseFlagEntry.buffer = inverseFlagBuffer;
     inverseFlagEntry.offset = 0;
-    inverseFlagEntry.size = sizeof(int32_t);  
+    inverseFlagEntry.size = sizeof(uint32_t);  
     
     wgpu::BindGroupEntry entries[] = {inputEntry, outputEntry, uniformEntry, inverseFlagEntry};
 
@@ -74,8 +74,14 @@ static wgpu::BindGroup createBindGroup(wgpu::Device& device, wgpu::BindGroupLayo
     return device.createBindGroup(bindGroupDesc);
 }
 
-void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<std::complex<float>>& input, int rows, int cols) {
-
+void dft(
+    WebGPUContext& context, 
+    wgpu::Buffer& finalOutputBuffer,
+    std::vector<std::complex<float>>& input, 
+    int rows, 
+    int cols, 
+    uint32_t doInverse
+) {
     buffer_size = input.size();
     Params params = {rows, cols};
 
@@ -89,6 +95,9 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     // Create the uniform buffer for dimensions.
     wgpu::Buffer uniformBuffer = createBuffer(device, &params, sizeof(Params), wgpu::BufferUsage::Uniform);
 
+    uint32_t inverseFlag = doInverse ? 1 : 0;
+    wgpu::Buffer inverseFlagBuffer = createBuffer(device, &inverseFlag, sizeof(uint32_t), wgpu::BufferUsage::Uniform);  
+
     // ROW DFT PASS -> save output in intermediate buffer before column pass
     wgpu::Buffer inputBuffer = createBuffer(device, input.data(), sizeof(float) * 2 * buffer_size, wgpu::BufferUsage::Storage);
     wgpu::Buffer intermediateBuffer = createBuffer(device, nullptr, sizeof(float) * 2 * buffer_size, WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc));
@@ -97,7 +106,7 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     wgpu::ShaderModule shaderModuleRow = createShaderModule(device, shaderCodeRow);
 
     wgpu::BindGroupLayout bindGroupLayout = createBindGroupLayout(device);
-    wgpu::BindGroup bindGroupRow = createBindGroup(device, bindGroupLayout, inputBuffer, intermediateBuffer, uniformBuffer);
+    wgpu::BindGroup bindGroupRow = createBindGroup(device, bindGroupLayout, inputBuffer, intermediateBuffer, uniformBuffer, inverseFlagBuffer);
     wgpu::ComputePipeline computePipelineRow = createComputePipeline(device, shaderModuleRow, bindGroupLayout);
 
     // Note: same workgroups for row pass & col pass
@@ -118,7 +127,7 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     std::string shaderCodeCol = readShaderFile("src/dft/dft_col.wgsl", limits.maxWorkgroupSizeX, limits.maxWorkgroupSizeY);
     wgpu::ShaderModule shaderModuleCol = createShaderModule(device, shaderCodeCol);
 
-    wgpu::BindGroup bindGroupCol = createBindGroup(device, bindGroupLayout, intermediateBuffer, finalOutputBuffer, uniformBuffer);
+    wgpu::BindGroup bindGroupCol = createBindGroup(device, bindGroupLayout, intermediateBuffer, finalOutputBuffer, uniformBuffer, inverseFlagBuffer);
     wgpu::ComputePipeline computePipelineCol = createComputePipeline(device, shaderModuleCol, bindGroupLayout);
 
     wgpu::CommandBuffer commandBufferCol = createComputeCommandBuffer(device, computePipelineCol, bindGroupCol, workgroupsX, workgroupsY);
@@ -132,4 +141,5 @@ void dft(WebGPUContext& context, wgpu::Buffer& finalOutputBuffer, std::vector<st
     shaderModuleCol.release();
     uniformBuffer.release();
     intermediateBuffer.release();
+    inverseFlagBuffer.release();
 }

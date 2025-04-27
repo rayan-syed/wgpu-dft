@@ -11,6 +11,8 @@
 using namespace std;
 
 int main() {
+    uint32_t doInverse = 0;
+
     // read input matrix
     ifstream infile("input.txt");
     if (!infile) {
@@ -47,7 +49,7 @@ int main() {
         WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc));
     
     // compute 2D DFT
-    dft(context, dftBuffer, flatInput, rows, cols);
+    dft(context, dftBuffer, flatInput, rows, cols, doInverse);
     vector<float> dft_out = readBack(context.device, context.queue, 2 * total, dftBuffer);
 
     // reform output into a 2D matrix
