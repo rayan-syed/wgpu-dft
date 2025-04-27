@@ -1,7 +1,7 @@
 import numpy as np
 import subprocess
 
-ROWS, COLS = 3,3
+ROWS, COLS = 512,512
 tolerance = 1e-4
 
 def generate_input_file(filename, rows=512, cols=512):
@@ -39,7 +39,7 @@ def parse_wgpu_output(output):
             im = float(parts[j * 2 + 1])
             result[i, j] = re + 1j * im
     for i in range(rows):
-        parts = lines[i+1].strip().split()
+        parts = lines[rows+i+1].strip().split()
         for j in range(cols):
             re = float(parts[j * 2])
             im = float(parts[j * 2 + 1])
@@ -58,18 +58,6 @@ def main():
     np_idft = np.fft.ifft2(np_input).astype(np.complex64)
     output = build_and_run_wgpu()
     wgpu_dft, wgpu_idft = parse_wgpu_output(output)
-
-    # andrew delete this
-    print("numpy dft:")
-    print(np_dft)
-    print("wgpu dft:")
-    print(wgpu_dft)
-    print()
-    print("numpy idft:")
-    print(np_idft)
-    print("wgpu idft:")
-    print(wgpu_idft)
-    print()
 
     # get relative difference dft
     is_close = np.isclose(wgpu_dft, np_dft, rtol=rel_tol, atol=1e-4) 

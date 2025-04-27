@@ -84,7 +84,6 @@ int main() {
         cout << "\n";
     }
 
-    cout << rows << " " << cols << "\n";
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
             cout << iresult[i][j].real() << " " << iresult[i][j].imag();
