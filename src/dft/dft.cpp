@@ -24,17 +24,22 @@ static wgpu::BindGroupLayout createBindGroupLayout(wgpu::Device& device) {
     uniformBufferLayout.visibility = wgpu::ShaderStage::Compute;
     uniformBufferLayout.buffer.type = wgpu::BufferBindingType::Uniform;
 
-    wgpu::BindGroupLayoutEntry entries[] = {inputBufferLayout, outputBufferLayout, uniformBufferLayout};
+    wgpu::BindGroupLayoutEntry inverseFlagLayout = {};
+    inverseFlagLayout.binding = 3;
+    inverseFlagLayout.visibility = wgpu::ShaderStage::Compute;
+    inverseFlagLayout.buffer.type = wgpu::BufferBindingType::Uniform;
+
+    wgpu::BindGroupLayoutEntry entries[] = {inputBufferLayout, outputBufferLayout, uniformBufferLayout, inverseFlagLayout};
 
     wgpu::BindGroupLayoutDescriptor layoutDesc = {};
-    layoutDesc.entryCount = 3;
+    layoutDesc.entryCount = 4;      
     layoutDesc.entries = entries;
 
     return device.createBindGroupLayout(layoutDesc);
 }
 
 // CREATING BIND GROUP
-static wgpu::BindGroup createBindGroup(wgpu::Device& device, wgpu::BindGroupLayout bindGroupLayout, wgpu::Buffer inputBuffer, wgpu::Buffer outputBuffer, wgpu::Buffer uniformBuffer) {
+static wgpu::BindGroup createBindGroup(wgpu::Device& device, wgpu::BindGroupLayout bindGroupLayout, wgpu::Buffer inputBuffer, wgpu::Buffer outputBuffer, wgpu::Buffer uniformBuffer, wgpu::Buffer inverseFlagBuffer) {
     wgpu::BindGroupEntry inputEntry = {};
     inputEntry.binding = 0;
     inputEntry.buffer = inputBuffer;
@@ -52,12 +57,18 @@ static wgpu::BindGroup createBindGroup(wgpu::Device& device, wgpu::BindGroupLayo
     uniformEntry.buffer = uniformBuffer;
     uniformEntry.offset = 0;
     uniformEntry.size = sizeof(Params);
+
+    wgpu::BindGroupEntry inverseFlagEntry = {};
+    inverseFlagEntry.binding = 3;
+    inverseFlagEntry.buffer = inverseFlagBuffer;
+    inverseFlagEntry.offset = 0;
+    inverseFlagEntry.size = sizeof(int32_t);  
     
-    wgpu::BindGroupEntry entries[] = {inputEntry, outputEntry, uniformEntry};
+    wgpu::BindGroupEntry entries[] = {inputEntry, outputEntry, uniformEntry, inverseFlagEntry};
 
     wgpu::BindGroupDescriptor bindGroupDesc = {};
     bindGroupDesc.layout = bindGroupLayout;
-    bindGroupDesc.entryCount = 3;
+    bindGroupDesc.entryCount = 4;
     bindGroupDesc.entries = entries;
 
     return device.createBindGroup(bindGroupDesc);
