@@ -1,7 +1,7 @@
 import numpy as np
 import subprocess
 
-ROWS, COLS = 512,512
+ROWS, COLS = 3,3
 tolerance = 1e-4
 
 def generate_input_file(filename, rows=512, cols=512):
@@ -31,13 +31,20 @@ def parse_wgpu_output(output):
     dims = lines[0].split()
     rows, cols = int(dims[0]), int(dims[1])
     result = np.zeros((rows, cols), dtype=np.complex64)
+    iresult = np.zeros((rows, cols), dtype=np.complex64)
     for i in range(rows):
         parts = lines[i+1].strip().split()
         for j in range(cols):
             re = float(parts[j * 2])
             im = float(parts[j * 2 + 1])
             result[i, j] = re + 1j * im
-    return result
+    for i in range(rows):
+        parts = lines[i+1].strip().split()
+        for j in range(cols):
+            re = float(parts[j * 2])
+            im = float(parts[j * 2 + 1])
+            iresult[i, j] = re + 1j * im
+    return result, iresult
 
 def main():
     input_filename = "input.txt"
@@ -48,13 +55,26 @@ def main():
     np_input = generate_input_file(input_filename, rows, cols)
     
     np_dft = np.fft.fft2(np_input).astype(np.complex64)
+    np_idft = np.fft.ifft2(np_input).astype(np.complex64)
     output = build_and_run_wgpu()
-    wgpu_dft = parse_wgpu_output(output)
+    wgpu_dft, wgpu_idft = parse_wgpu_output(output)
 
-    # get relative difference
+    # andrew delete this
+    print("numpy dft:")
+    print(np_dft)
+    print("wgpu dft:")
+    print(wgpu_dft)
+    print()
+    print("numpy idft:")
+    print(np_idft)
+    print("wgpu idft:")
+    print(wgpu_idft)
+    print()
+
+    # get relative difference dft
     is_close = np.isclose(wgpu_dft, np_dft, rtol=rel_tol, atol=1e-4) 
     mismatches = np.sum(~is_close)
-
+    print("------------------------------DFT COMPARSION:------------------------------")
     print(f"Number of elements with relative difference > {rel_tol}: {mismatches}")
 
     # Print top 5 offenders as necessary
@@ -65,6 +85,43 @@ def main():
     for (i,j) in inds:  
         w = wgpu_dft[i,j]
         e = np_dft[i,j]
+        err = abs(w-e)
+        rel = err / abs(e) if abs(e)>0 else err
+        if rel > biggest_err[0]:
+            biggest_err = (rel, [w,e,err])
+
+        # keep 5 biggest errors
+        if len(biggest_rel_err) < 5 and err > 1e-4:
+            heapq.heappush(biggest_rel_err, rel) 
+        elif rel > min(biggest_rel_err) and err > 1e-4: 
+            heapq.heappop(biggest_rel_err)
+            heapq.heappush(biggest_rel_err, rel)
+
+    print("Top 5 biggest relative errors (largest->smallest) with absolute error > 1e-4:")
+    biggest_rel_err.sort(reverse=True)
+    for err in biggest_rel_err:
+        print(err)
+    if not biggest_rel_err:
+        print("None")
+
+    print("\nBiggest relative difference details:")
+    items = biggest_err[1]
+    print(f"wgpu: {items[0]}, np: {items[1]}, abs_err: {items[2]}")
+
+    # get relative difference idft
+    is_close = np.isclose(wgpu_idft, np_idft, rtol=rel_tol, atol=1e-4) 
+    mismatches = np.sum(~is_close)
+    print("\n------------------------------IDFT COMPARSION:------------------------------")
+    print(f"Number of elements with relative difference > {rel_tol}: {mismatches}")
+
+    # Print top 5 offenders as necessary
+    import heapq
+    inds = np.argwhere(~is_close)
+    biggest_rel_err = []
+    biggest_err = (0,[0,0,0])
+    for (i,j) in inds:  
+        w = wgpu_idft[i,j]
+        e = np_idft[i,j]
         err = abs(w-e)
         rel = err / abs(e) if abs(e)>0 else err
         if rel > biggest_err[0]:
