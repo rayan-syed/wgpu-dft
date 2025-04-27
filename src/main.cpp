@@ -49,12 +49,15 @@ int main() {
     wgpu::Buffer idftBuffer = createBuffer(context.device, nullptr, sizeof(float) * 2 * total,
         WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc)); 
     
+    // init input buffer
+    wgpu::Buffer inputBuffer = createBuffer(context.device, flatInput.data(), sizeof(float) * 2 * flatInput.size(), wgpu::BufferUsage::Storage);
+    
     // compute 2D DFT
-    dft(context, dftBuffer, flatInput, rows, cols, 0);
+    dft(context, dftBuffer, inputBuffer, flatInput.size(), rows, cols, 0);
     vector<float> dft_out = readBack(context.device, context.queue, 2 * total, dftBuffer);
 
     // compute 2D IDFT
-    dft(context, idftBuffer, flatInput, rows, cols, 1);
+    dft(context, idftBuffer, inputBuffer, flatInput.size(), rows, cols, 1);
     vector<float> idft_out = readBack(context.device, context.queue, 2 * total, idftBuffer);
 
     // reform output into a 2D matrix
@@ -101,6 +104,7 @@ int main() {
     wgpuInstanceRelease(context.instance);
     dftBuffer.release();
     idftBuffer.release();
+    inputBuffer.release();
 
     return 0;
 }

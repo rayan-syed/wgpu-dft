@@ -11,7 +11,8 @@
 void dft(
     WebGPUContext& context,
     wgpu::Buffer& outputBuffer,
-    std::vector<std::complex<float>>& input, 
+    wgpu::Buffer& inputBuffer,
+    size_t buffersize,
     int rows,
     int cols,
     uint32_t doInverse

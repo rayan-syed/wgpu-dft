@@ -77,12 +77,13 @@ static wgpu::BindGroup createBindGroup(wgpu::Device& device, wgpu::BindGroupLayo
 void dft(
     WebGPUContext& context, 
     wgpu::Buffer& finalOutputBuffer,
-    std::vector<std::complex<float>>& input, 
+    wgpu::Buffer& inputBuffer,
+    size_t buffersize,
     int rows, 
     int cols, 
     uint32_t doInverse
 ) {
-    buffer_size = input.size();
+    buffer_size = buffersize;
     Params params = {rows, cols};
 
     // Retrieve device and queue.
@@ -99,7 +100,6 @@ void dft(
     wgpu::Buffer inverseFlagBuffer = createBuffer(device, &inverseFlag, sizeof(uint32_t), wgpu::BufferUsage::Uniform);  
 
     // ROW DFT PASS -> save output in intermediate buffer before column pass
-    wgpu::Buffer inputBuffer = createBuffer(device, input.data(), sizeof(float) * 2 * buffer_size, wgpu::BufferUsage::Storage);
     wgpu::Buffer intermediateBuffer = createBuffer(device, nullptr, sizeof(float) * 2 * buffer_size, WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc));
 
     std::string shaderCodeRow = readShaderFile("src/dft/dft_row.wgsl", limits.maxWorkgroupSizeX, limits.maxWorkgroupSizeY);
@@ -121,7 +121,6 @@ void dft(
     computePipelineRow.release();
     bindGroupRow.release();
     shaderModuleRow.release();
-    inputBuffer.release();
 
     // COLUMN DFT PASS
     std::string shaderCodeCol = readShaderFile("src/dft/dft_col.wgsl", limits.maxWorkgroupSizeX, limits.maxWorkgroupSizeY);
