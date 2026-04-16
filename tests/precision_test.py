@@ -1,10 +1,13 @@
 import numpy as np
 import subprocess
+from pathlib import Path
 
 ROWS, COLS = 512, 512
 TOLERANCE = 1e-4
+PYTEST_TOLERANCE = 1e-2
 
 def generate_input_file(filename, rows=512, cols=512):
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
     real = np.random.rand(rows, cols).astype(np.float32)
     imag = np.random.rand(rows, cols).astype(np.float32)
     input_complex = real + 1j * imag
@@ -105,21 +108,42 @@ def print_summary(mismatches, offender):
     print(f"wgpu : {offender['actual']}")
     print(f"numpy: {offender['expected']}")
 
-def test_mode(title, force_dft, np_input):
+def run_mode(force_dft, np_input, rel_tol=TOLERANCE):
     np_forward = np.fft.fft2(np_input).astype(np.complex64)
     np_inverse = np.fft.ifft2(np_input).astype(np.complex64)
 
     output = run_wgpu(force_dft=force_dft)
     wgpu_forward, wgpu_inverse = parse_wgpu_output(output)
 
-    forward_mismatches, forward_offender = compare_results(wgpu_forward, np_forward)
-    inverse_mismatches, inverse_offender = compare_results(wgpu_inverse, np_inverse)
+    forward_mismatches, forward_offender = compare_results(wgpu_forward, np_forward, rel_tol=rel_tol)
+    inverse_mismatches, inverse_offender = compare_results(wgpu_inverse, np_inverse, rel_tol=rel_tol)
+    return {
+        "forward": (forward_mismatches, forward_offender),
+        "backward": (inverse_mismatches, inverse_offender),
+    }
+
+def report_mode(title, force_dft, np_input):
+    results = run_mode(force_dft=force_dft, np_input=np_input)
 
     print_section(title)
     print_subsection("Forward")
-    print_summary(forward_mismatches, forward_offender)
+    print_summary(*results["forward"])
     print_subsection("Backward")
-    print_summary(inverse_mismatches, inverse_offender)
+    print_summary(*results["backward"])
+
+# for pytest
+def test_precision_512x512_rel_tol_1e_2():
+    build_wgpu()
+    np_input = generate_input_file("tests/artifacts/input.txt", ROWS, COLS)
+
+    for title, force_dft in [("DFT", True), ("FFT", False)]:
+        results = run_mode(force_dft=force_dft, np_input=np_input, rel_tol=PYTEST_TOLERANCE)
+        for direction in ["forward", "backward"]:
+            mismatches, offender = results[direction]
+            assert mismatches == 0, (
+                f"{title} {direction} exceeded rel_tol={PYTEST_TOLERANCE}: "
+                f"mismatches={mismatches}, offender={offender}"
+            )
 
 def main():
     print("Building WGPU DFT project...")
@@ -128,8 +152,8 @@ def main():
     np_input = generate_input_file("tests/artifacts/input.txt", ROWS, COLS)
     print(f"Input shape: {ROWS}x{COLS}")
 
-    test_mode("DFT", force_dft=True, np_input=np_input)
-    test_mode("FFT", force_dft=False, np_input=np_input)
+    report_mode("DFT", force_dft=True, np_input=np_input)
+    report_mode("FFT", force_dft=False, np_input=np_input)
 
 if __name__ == "__main__":
     main()
