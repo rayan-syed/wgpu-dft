@@ -125,7 +125,7 @@ def main():
     print("Building WGPU DFT project...")
     build_wgpu()
 
-    np_input = generate_input_file("input.txt", ROWS, COLS)
+    np_input = generate_input_file("tests/artifacts/input.txt", ROWS, COLS)
     print(f"Input shape: {ROWS}x{COLS}")
 
     test_mode("DFT", force_dft=True, np_input=np_input)
