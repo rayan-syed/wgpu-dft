@@ -1,18 +1,53 @@
 #define WEBGPU_CPP_IMPLEMENTATION
-#include "dft/dft.h"
+#include "fft/fft.h"
 #include "webgpu_utils.h"
-#include <vector>
-#include <iostream>
-#include <fstream>
-#include <sstream>
 #include <complex>
+#include <fstream>
+#include <iostream>
 #include <string>
+#include <vector>
 
 using namespace std;
 
-int main() {
+namespace {
 
-    // read input matrix
+bool parseForceDft(int argc, char* argv[]) {
+    for (int index = 1; index < argc; ++index) {
+        const string arg(argv[index]);
+        if (arg == "--force-dft" || arg == "dft") {
+            return true;
+        }
+    }
+    return false;
+}
+
+vector<complex<float>> flattenMatrix(const vector<vector<complex<float>>>& input) {
+    vector<complex<float>> flatInput;
+    flatInput.reserve(input.size() * input.front().size());
+    for (const auto& row : input) {
+        flatInput.insert(flatInput.end(), row.begin(), row.end());
+    }
+    return flatInput;
+}
+
+void printMatrix(const vector<float>& buffer, int rows, int cols) {
+    for (int row = 0; row < rows; ++row) {
+        for (int col = 0; col < cols; ++col) {
+            const int index = (row * cols + col) * 2;
+            cout << buffer[index] << " " << buffer[index + 1];
+            if (col < cols - 1) {
+                cout << " ";
+            }
+        }
+        cout << "\n";
+    }
+}
+
+} // namespace
+
+int main(int argc, char* argv[]) {
+    const bool forceDft = parseForceDft(argc, argv);
+
     ifstream infile("input.txt");
     if (!infile) {
         cerr << "Failed to open input.txt" << endl;
@@ -31,79 +66,36 @@ int main() {
     }
     infile.close();
 
-    // Flatten matrix row-major order for dft input
-    vector<complex<float>> flatInput;
-    flatInput.reserve(rows * cols);
-    for (const auto &row : input) {
-        flatInput.insert(flatInput.end(), row.begin(), row.end());
-    }
+    vector<complex<float>> flatInput = flattenMatrix(input);
 
-    // init wgpu
     WebGPUContext context;
     initWebGPU(context);
 
-    // init output buffer
-    int total = rows * cols;
-    wgpu::Buffer dftBuffer = createBuffer(context.device, nullptr, sizeof(float) * 2 * total,
+    const int total = rows * cols;
+    wgpu::Buffer forwardBuffer = createBuffer(context.device, nullptr, sizeof(float) * 2 * total,
         WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc));
-    wgpu::Buffer idftBuffer = createBuffer(context.device, nullptr, sizeof(float) * 2 * total,
+    wgpu::Buffer inverseBuffer = createBuffer(context.device, nullptr, sizeof(float) * 2 * total,
         WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc)); 
-    
-    // init input buffer
-    wgpu::Buffer inputBuffer = createBuffer(context.device, flatInput.data(), sizeof(float) * 2 * flatInput.size(), wgpu::BufferUsage::Storage);
-    
-    // compute 2D DFT
-    dft(context, dftBuffer, inputBuffer, flatInput.size(), rows, cols, 0);
-    vector<float> dft_out = readBack(context.device, context.queue, 2 * total, dftBuffer);
 
-    // compute 2D IDFT
-    dft(context, idftBuffer, inputBuffer, flatInput.size(), rows, cols, 1);
-    vector<float> idft_out = readBack(context.device, context.queue, 2 * total, idftBuffer);
+    wgpu::Buffer inputBuffer = createBuffer(context.device, flatInput.data(), sizeof(float) * 2 * flatInput.size(), 
+        WGPUBufferUsage(wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopySrc));
 
-    // reform output into a 2D matrix
-    vector<vector<std::complex<float>>> result(rows, vector<std::complex<float>>(cols));
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            int index = (i * cols + j) * 2;
-            result[i][j] = { dft_out[index], dft_out[index + 1] };
-        }
-    }
+    fft(context, forwardBuffer, inputBuffer, flatInput.size(), rows, cols, 0, forceDft);
+    vector<float> forwardOutput = readBack(context.device, context.queue, 2 * total, forwardBuffer);
 
-    vector<vector<std::complex<float>>> iresult(rows, vector<std::complex<float>>(cols));
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            int index = (i * cols + j) * 2;
-            iresult[i][j] = { idft_out[index], idft_out[index + 1] };
-        }
-    }
+    fft(context, inverseBuffer, inputBuffer, flatInput.size(), rows, cols, 1, forceDft);
+    vector<float> inverseOutput = readBack(context.device, context.queue, 2 * total, inverseBuffer);
 
-    // print output for test script to read in
     cout << rows << " " << cols << "\n";
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            cout << result[i][j].real() << " " << result[i][j].imag();
-            if (j < cols - 1) cout << " ";
-        }
-        cout << "\n";
-    }
+    printMatrix(forwardOutput, rows, cols);
+    printMatrix(inverseOutput, rows, cols);
 
-    for (int i = 0; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            cout << iresult[i][j].real() << " " << iresult[i][j].imag();
-            if (j < cols - 1) cout << " ";
-        }
-        cout << "\n";
-    }
-
-
-
-    // clear wgpu resources
     wgpuQueueRelease(context.queue);
     wgpuDeviceRelease(context.device);
     wgpuAdapterRelease(context.adapter);
     wgpuInstanceRelease(context.instance);
-    dftBuffer.release();
-    idftBuffer.release();
+    forwardBuffer.release();
+    inverseBuffer.release();
     inputBuffer.release();
 
     return 0;
