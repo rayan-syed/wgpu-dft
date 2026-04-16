@@ -1,0 +1,35 @@
+name: Build & Run FFT Tests
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 0
+
+      - name: Setup Vulkan Backend for WGPU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan1 vulkan-tools mesa-vulkan-drivers
+          echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json" >> $GITHUB_ENV
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+        
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run Precision Test
+        run: pytest tests/precision_test.py
+
