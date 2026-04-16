@@ -10,6 +10,7 @@ add_executable(
     src/main.cpp 
     src/webgpu_utils.cpp
     src/dft/dft.cpp
+    src/fft/fft.cpp
 )
 
 set_target_properties(wgpu_dft PROPERTIES
