@@ -106,7 +106,7 @@ We evaluate runtime performance of the WebGPU implementation against both a dire
 
 These results demonstrate that the WebGPU FFT implementation provides **significant performance improvements over naive methods** while remaining competitive with GPU-based FFT libraries, making it a very helpful module for any WebGPU projects using FFTs.
 
-### Conclusions
+## Conclusions
 
 For any questions, feel free to contact me at rsyed@bu.edu.
 
