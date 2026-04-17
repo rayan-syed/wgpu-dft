@@ -1,7 +1,6 @@
 from pathlib import Path
 import csv
 import subprocess
-import time
 import os
 
 import numpy as np
@@ -9,7 +8,7 @@ import matplotlib.pyplot as plt
 
 # benchmarking params
 WARMUP_DIMENSIONS = [128]
-DIMENSIONS = [64, 128, 256]
+DIMENSIONS = [256, 512, 1024, 2048, 4096]
 REPEATS = 5
 
 # output artifacts
@@ -58,20 +57,38 @@ def run_transform(force_dft, mode):
     )
 
 
-def benchmark_pass(force_dft, mode, repeats):
-    durations_ms = []
-    for _ in range(repeats):
-        start = time.perf_counter()
-        run_transform(force_dft=force_dft, mode=mode)
-        end = time.perf_counter()
-        durations_ms.append((end - start) * 1000.0)
+def parse_benchmark_output(output):
+    stats = {}
+    for line in output.strip().splitlines():
+        parts = line.split()
+        if not parts or parts[0] == "benchmark":
+            continue
+        if parts[0] == "raw_ms":
+            stats["raw_ms"] = [float(value) for value in parts[1:]]
+        else:
+            stats[parts[0]] = float(parts[1])
 
     return {
-        "mean_ms": float(np.mean(durations_ms)),
-        "min_ms": float(np.min(durations_ms)),
-        "max_ms": float(np.max(durations_ms)),
-        "raw_ms": durations_ms,
+        "mean_ms": stats["mean_ms"],
+        "min_ms": stats["min_ms"],
+        "max_ms": stats["max_ms"],
+        "raw_ms": stats["raw_ms"],
     }
+
+
+def benchmark_pass(force_dft, mode, repeats):
+    command = ["build/wgpu_dft", f"--mode={mode}", f"--benchmark={repeats}"]
+    if force_dft:
+        command.append("--force-dft")
+
+    result = subprocess.run(
+        command,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        universal_newlines=True,
+    )
+    return parse_benchmark_output(result.stdout)
 
 
 def benchmark_dimension(dimension, repeats):

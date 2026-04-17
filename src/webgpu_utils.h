@@ -51,4 +51,7 @@ wgpu::CommandBuffer createComputeCommandBuffer(
 // Readback from GPU to CPU
 std::vector<float> readBack(wgpu::Device& device, wgpu::Queue& queue, size_t buffer_len, wgpu::Buffer& outputBuffer);
 
+// Wait until all previously submitted GPU work has completed -- need for exhaustive benchmarking tests
+void waitForQueueIdle(wgpu::Device& device, wgpu::Queue& queue);
+
 #endif

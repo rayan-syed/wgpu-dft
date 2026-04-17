@@ -217,3 +217,17 @@ std::vector<float> readBack(wgpu::Device& device, wgpu::Queue& queue, size_t buf
 
     return output;
 }
+
+void waitForQueueIdle(wgpu::Device& device, wgpu::Queue& queue) {
+    bool workDone = false;
+    auto callback = queue.onSubmittedWorkDone([&](wgpu::QueueWorkDoneStatus status) {
+        if (status != wgpu::QueueWorkDoneStatus::Success) {
+            std::cerr << "Queue completion failed with status: " << int(status) << std::endl;
+        }
+        workDone = true;
+    });
+
+    while (!workDone) {
+        wgpuDevicePoll(device, false, nullptr);
+    }
+}
