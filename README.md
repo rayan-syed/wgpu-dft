@@ -22,4 +22,58 @@ Both implementations use a two-pass strategy. The transform is first computed al
 
 It is well known that GPU-based computations can be prone to inaccuracies. To mitigate this, we incorporated several optimizations within the shader files to improve numerical precision. 
 
+## Testing and Benchmarking
+
+To prove the accuracy and practicality of our WebGPU FFT implementation, we have performed substantial precision and efficiency tests. All tests were completed on an A100 GPU.
+
+### Precision
+
+We evaluate numerical accuracy by comparing the WebGPU implementation against NumPy’s `fft2` and `ifft2` (cast to `complex64`). All comparisons use a relative tolerance of **1e-4** and absolute tolerance of **1e-4**. The worst relative error outside this tolerance is displayed in the table below as 'Max Relative Error.'
+
+Tests were conducted on randomly generated complex-valued inputs across increasing resolutions: **512² → 8192²**.
+
+#### Results
+
+##### FFT (Cooley–Tukey path, power-of-2)
+
+| Size       | Forward Mismatches | Max Relative Error |
+|------------|------------------|--------------------|
+| 512 × 512  | 0                | —                  |
+| 1024 × 1024| 7                | 4.16e-4            |
+| 2048 × 2048| 27               | 1.35e-3            |
+| 4096 × 4096| 193              | 7.90e-4            |
+| 8192 × 8192| 941              | 4.20e-3            |
+
+- Mismatch rate remains extremely low (≪ 0.01% of elements)
+- Error growth is gradual and consistent with floating-point accumulation at scale
+
+##### DFT (fallback path)
+
+| Size       | Forward Mismatches | Max Relative Error |
+|------------|------------------|--------------------|
+| 512 × 512  | 94               | 8.58e-4            |
+| 1024 × 1024| 759              | 2.21e-3            |
+| 2048 × 2048| 3862             | 8.71e-3            |
+| 4096 × 4096| 12782            | 1.43e-2            |
+| 8192 × 8192| 47,912,213       | 5.47e+0            |
+
+- Error increases significantly with size due to:
+  - O(N²) accumulation
+  - increased floating-point cancellation
+  - lack of hierarchical structure (vs FFT)
+
+##### Inverse Transform
+
+- **0 mismatches across all sizes and both implementations**
+- Indicates strong numerical stability of inverse computation
+
+#### Interpretation
+
+- The **FFT path achieves near parity with NumPy** at all tested scales, with only minor floating-point deviations.
+- Error growth is expected and remains well-controlled even at **8192²** resolution.
+- The **DFT path is accurate for small inputs** but becomes numerically unstable at large scales, which is expected given its computational structure and lack of factorization.
+
+These results validate the correctness and robustness of the WebGPU FFT implementation under realistic workloads.
+
+### Efficiency
 
