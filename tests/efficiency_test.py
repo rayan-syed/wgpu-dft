@@ -6,6 +6,7 @@ import time
 
 import numpy as np
 import matplotlib.pyplot as plt
+import cupy as cp
 
 # benchmarking params
 WARMUP_DIMENSIONS = [128]
@@ -92,13 +93,16 @@ def benchmark_pass(force_dft, mode, repeats):
     return parse_benchmark_output(result.stdout)
 
 
-def benchmark_numpy_pass(values, direction, repeats):
+def benchmark_cupy_pass(values, direction, repeats):
     durations_ms = []
-    transform = np.fft.fft2 if direction == "forward" else np.fft.ifft2
+    transform = cp.fft.fft2 if direction == "forward" else cp.fft.ifft2
+    gpu_values = cp.asarray(values)
+    cp.cuda.Stream.null.synchronize()
 
     for _ in range(repeats):
         start = time.perf_counter()
-        transform(values)
+        transform(gpu_values)
+        cp.cuda.Stream.null.synchronize()
         end = time.perf_counter()
         durations_ms.append((end - start) * 1000.0)
 
@@ -116,7 +120,7 @@ def benchmark_dimension(dimension, repeats):
     values = np.loadtxt(input_path, skiprows=1, dtype=np.float32).reshape(dimension, dimension, 2)
     np_input = values[:, :, 0] + 1j * values[:, :, 1]
 
-    results = {"DFT": {}, "FFT": {}, "NumPy": {}}
+    results = {"DFT": {}, "FFT": {}, "CuPy": {}}
     for algorithm, force_dft in [("DFT", True), ("FFT", False)]:
         for direction in ["forward", "backward"]:
             print(f"Running benchmarks: {dimension}x{dimension} | {algorithm} | {direction}")
@@ -126,8 +130,8 @@ def benchmark_dimension(dimension, repeats):
                 repeats=repeats,
             )
     for direction in ["forward", "backward"]:
-        print(f"Running benchmarks: {dimension}x{dimension} | NumPy | {direction}")
-        results["NumPy"][direction] = benchmark_numpy_pass(
+        print(f"Running benchmarks: {dimension}x{dimension} | CuPy | {direction}")
+        results["CuPy"][direction] = benchmark_cupy_pass(
             values=np_input,
             direction=direction,
             repeats=repeats,
@@ -145,10 +149,12 @@ def run_warmup():
             for direction in ["forward", "backward"]:
                 print(f"Warmup: {dimension}x{dimension} | {algorithm} | {direction}")
                 run_transform(force_dft=force_dft, mode=direction)
+        gpu_input = cp.asarray(np_input)
         for direction in ["forward", "backward"]:
-            print(f"Warmup: {dimension}x{dimension} | NumPy | {direction}")
-            transform = np.fft.fft2 if direction == "forward" else np.fft.ifft2
-            transform(np_input)
+            print(f"Warmup: {dimension}x{dimension} | CuPy | {direction}")
+            transform = cp.fft.fft2 if direction == "forward" else cp.fft.ifft2
+            transform(gpu_input)
+            cp.cuda.Stream.null.synchronize()
 
 
 def write_csv(results):
@@ -185,12 +191,12 @@ def plot_direction(results, direction, destination):
     dimensions = sorted(results.keys())
     dft_values = [results[dimension]["DFT"][direction]["mean_ms"] for dimension in dimensions]
     fft_values = [results[dimension]["FFT"][direction]["mean_ms"] for dimension in dimensions]
-    numpy_values = [results[dimension]["NumPy"][direction]["mean_ms"] for dimension in dimensions]
+    cupy_values = [results[dimension]["CuPy"][direction]["mean_ms"] for dimension in dimensions]
 
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(dimensions, dft_values, marker="o", linewidth=2, label="DFT")
     ax.plot(dimensions, fft_values, marker="s", linewidth=2, label="FFT")
-    ax.plot(dimensions, numpy_values, marker="^", linewidth=2, label="NumPy")
+    ax.plot(dimensions, cupy_values, marker="^", linewidth=2, label="CuPy")
     ax.set_title(f"{direction.capitalize()} Transform Runtime")
     ax.set_xlabel("Matrix dimension (N for NxN)")
     ax.set_ylabel("Mean runtime (ms)")
