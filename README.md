@@ -77,3 +77,34 @@ These results validate the correctness and robustness of the WebGPU FFT implemen
 
 ### Efficiency
 
+We evaluate runtime performance of the WebGPU implementation against both a direct DFT baseline and a GPU-based reference (CuPy) across input sizes ranging from **256 × 256 to 4096 × 4096**.
+
+#### Forward Transform
+
+<img src="docs/efficiency_forward.png" width="500"/>
+
+#### Backward Transform
+
+<img src="docs/efficiency_backward.png" width="500"/>
+
+#### Key Observations
+
+- **DFT vs FFT Scaling**  
+  The direct DFT exhibits quadratic growth O(N²) and becomes prohibitively expensive beyond moderate input sizes. In contrast, the FFT scales as O(NlogN), resulting in substantial speedups at larger resolutions (e.g., 4096²).
+
+- **Crossover Behavior**  
+  For small inputs (≤512²), the DFT is faster due to lower overhead and efficient parallelization of dense computation. The FFT becomes advantageous at approximately **1024–2048**, after which it consistently outperforms the DFT.
+
+- **WebGPU FFT vs CuPy**  
+  At larger sizes (2048² and above), the WebGPU FFT achieves **comparable performance to CuPy**, indicating that the implementation is competitive with established GPU FFT libraries for large workloads.
+
+#### Summary
+
+- **DFT**: efficient only for small inputs; does not scale  
+- **FFT (WebGPU)**: scalable and efficient; dominant at moderate-to-large sizes  
+- **CuPy**: strong GPU baseline; WebGPU achieves comparable performance at scale  
+
+These results demonstrate that the WebGPU FFT implementation provides **significant performance improvements over naive methods** while remaining competitive with GPU-based FFT libraries, making it a very helpful module for any WebGPU projects using FFTs.
+
+For any questions, feel free to contact me at rsyed@bu.edu.
+
